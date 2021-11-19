@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <time.h>
+#include <stdlib.h>
 
 // The number of registration desks that are available.
 int REGISTRATION_SIZE = 10;
@@ -77,8 +79,31 @@ int CAFE_COST = 200;
 int HUNGER_INCREASE_RATE = 10;
 int RESTROOM_INCREASE_RATE = 10;
 
+// IMPORTANT: Initialize the random number generator.
+// This is the only function that you need to call before using any other function.
+// The seed is the number that will be used to generate random numbers.
+// If you leave it blank, the current time will be used.
+void init_random(int seed)
+{
+    if (seed == 0)
+    {
+        srand(time(NULL));
+    }
+    else
+    {
+        srand(seed);
+    }
+}
+int c_rand(int min, int max)
+{
+    return rand() % (max - min + 1) + min;
+}
+
 int main()
 {
+    int STUDENT_ID = 2019510078;
+    // Initialize the random number generator.
+    init_random(STUDENT_ID); // You can change the seed to any number. But I chose to go with my student ID.
 
     return 0;
 }
