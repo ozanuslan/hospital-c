@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
+#include <pthread.h>
+#include <unistd.h>
 
 // The number of registration desks that are available.
 int REGISTRATION_SIZE = 10;
@@ -79,10 +81,12 @@ int CAFE_COST = 200;
 int HUNGER_INCREASE_RATE = 10;
 int RESTROOM_INCREASE_RATE = 10;
 
-// IMPORTANT: Initialize the random number generator.
+// IMPORTANT: Initialize the random number generator if you want your randomizer to be seeded.
+// If you don't initialize the random number generator, the random number generator will be seeded with the current time.
 // This is the only function that you need to call before using any other function.
 // The seed is the number that will be used to generate random numbers.
 // If you leave it blank, the current time will be used.
+// Note: Seeding is really useful for debugging, as it will make your program to generate the same random numbers every time.
 void init_random(int seed)
 {
     if (seed == 0)
@@ -99,11 +103,13 @@ int c_rand(int min, int max)
     return rand() % (max - min + 1) + min;
 }
 
+// You can change the seed to any number. But I chose to go with my student ID.
+int SEED = 2019510078;
+
 int main()
 {
-    int STUDENT_ID = 2019510078;
     // Initialize the random number generator.
-    init_random(STUDENT_ID); // You can change the seed to any number. But I chose to go with my student ID.
+    init_random(SEED);
 
     return 0;
 }
