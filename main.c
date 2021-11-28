@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <sys/types.h>
 
 // The number of registration desks that are available.
 int REGISTRATION_SIZE = 10;
