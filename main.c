@@ -104,13 +104,38 @@ int c_rand(int min, int max)
     return rand() % (max - min + 1) + min;
 }
 
-// You can change the seed to any number. But I chose to go with my student ID.
+pthread_mutex_t mutex_registration = PTHREAD_MUTEX_INITIALIZER;
+int pat_count = 0;
+void *patient(void *arg)
+{
+    pthread_mutex_lock(&mutex_registration);
+    pat_count++;
+    printf("Patient %d arrived.\n", pat_count);
+    pthread_mutex_unlock(&mutex_registration);
+    pthread_exit(NULL);
+}
+
+// You can change the randomizer's seed to any number. But I chose to go with my student ID.
 int SEED = 2019510078;
 
 int main()
 {
     // Initialize the random number generator.
     init_random(SEED);
+
+    pthread_t *patient_thread;
+    patient_thread = (pthread_t *)malloc(sizeof(pthread_t) * PATIENT_NUMBER);
+
+    for (int i = 0; i < PATIENT_NUMBER; i++)
+    {
+        // Create a thread for the patient.
+        pthread_create(patient_thread + i, NULL, patient, NULL);
+    }
+
+    for (int i = 0; i < PATIENT_NUMBER; i++)
+    {
+        pthread_join(*(patient_thread + i), NULL);
+    }
 
     return 0;
 }
