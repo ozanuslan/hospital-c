@@ -205,9 +205,9 @@ void init_semaphores()
                     sem_init(&S_PHARMACY, 0, PHARMACY_NUMBER),
                     sem_init(&S_BLOOD_LAB, 0, BLOOD_LAB_NUMBER),
                     sem_init(&S_OR, 0, OR_NUMBER),
-                    sem_init(&S_HOSPITAL_WALLET, 0, 1),
-                    sem_init(&S_SURGEON, 0, 1),
-                    sem_init(&S_NURSE, 0, 1)};
+                    sem_init(&S_HOSPITAL_WALLET, 0, 1), // Binary semaphore
+                    sem_init(&S_SURGEON, 0, 1),         // Binary semaphore
+                    sem_init(&S_NURSE, 0, 1)};          // Binary semaphore
 
     for (int i = 0; i < sizeof(sems) / sizeof(int); i++)
     {
