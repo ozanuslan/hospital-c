@@ -16,6 +16,19 @@ typedef enum Need
     NEED_CNT // NEED_CNT must always be at the end
 } need;
 
+char *need_str[] = {
+    "surgery",
+    "medicine",
+    "blood test"};
+
+typedef enum PatientState
+{
+    WAITING_REGISTRATION,
+    WAITING_GP,
+    // You can add new states here
+    PATIENT_STATE_CNT // PATIENT_STATE_CNT must always be at the end
+} patient_state;
+
 // The number of registration desks that are available.
 #define REGISTRATION_SIZE 10
 // The number of restrooms that are available.
@@ -42,7 +55,7 @@ int NURSE_NUMBER = 30;
 #define NURSE_LIMIT 5
 
 // The number of patients that will be generated over the course of this program.
-#define PATIENT_NUMBER 1000
+#define PATIENT_NUMBER 100
 // The account of hospital where the money acquired from patients are stored.
 int HOSPITAL_WALLET = 0;
 
@@ -57,7 +70,7 @@ int HOSPITAL_WALLET = 0;
  *  that determines how long a patient will wait before each operation to retry to execute. 
  * Assuming the given department is full
 */
-#define ARRIVAL_TIME 100
+#define ARRIVAL_TIME 40
 #define WAIT_TIME 100
 #define REGISTRATION_TIME 100
 #define GP_TIME 200
@@ -89,7 +102,7 @@ int HOSPITAL_WALLET = 0;
 /*
  * Calculated randomly between 1 and given value.
  * The global increase rate of hunger and restroom needs of patients. 
- * It will increaserandomly between 1 and given rate below.
+ * It will increase randomly between 1 and given rate below.
 */
 #define HUNGER_INCREASE_RATE 10
 #define RESTROOM_INCREASE_RATE 10
@@ -100,6 +113,7 @@ typedef struct Patients
     short hunger_meter;   // Initialized between 1 and 100 at creation.
     short restroom_meter; // Initialized between 1 and 100 at creation.
     unsigned short need;
+    unsigned short status;
 
 } patient;
 
@@ -109,6 +123,8 @@ void msleep(int msec);
 void init_semaphores();
 patient create_patient(int pid);
 void *patient_job(void *arg);
+void log_event(char *event, int pid);
+void log_patient_details(patient p);
 
 patient *PATIENTS;
 
@@ -144,8 +160,16 @@ int main()
 
     for (int i = 0; i < PATIENT_NUMBER; i++)
     {
-        pthread_create(patient_thread + i, NULL, patient_job, &i);
-        // msleep(myrand(0, ARRIVAL_TIME)); // <- TODO: Uncomment this
+        log_patient_details(PATIENTS[i]);
+        log_event("Attempting to create thread", i);
+        if (pthread_create(patient_thread + i, NULL, patient_job, &i) == 0)
+        {
+            msleep(myrand(0, ARRIVAL_TIME)); // <- TODO: Uncomment this
+        }
+        else
+        {
+            log_event("Failed to create", i);
+        }
     }
 
     for (int i = 0; i < PATIENT_NUMBER; i++)
@@ -153,10 +177,60 @@ int main()
         pthread_join(*(patient_thread + i), NULL);
     }
 
-    free(patient_thread);
-    free(PATIENTS);
-
     return 0;
+}
+
+// Expects patient id as the arg
+void *patient_job(void *arg)
+{
+    int pid = *(int *)arg;
+    log_event("Entered hospital", pid);
+    while (PATIENTS[pid].status == WAITING_REGISTRATION)
+    {
+        if (PATIENTS[pid].status == WAITING_REGISTRATION)
+        {
+            log_event("Checking registration", pid);
+            if (sem_trywait(&S_REGISTRATION) == 0) // Try to acquire the registration semaphore
+            {
+                log_event("Entered registration area", pid);
+
+                // Registration takes some time
+                msleep(myrand(0, REGISTRATION_TIME));
+
+                // Every person who registers must pay for registration
+                log_event("Waiting to pay registration cost", pid);
+                sem_wait(&S_HOSPITAL_WALLET);
+                HOSPITAL_WALLET += REGISTRATION_COST;
+                sem_post(&S_HOSPITAL_WALLET);
+
+                log_event("Registered successfully", pid);
+                PATIENTS[pid].status = WAITING_GP;
+                // Let go of the registration semaphore
+                sem_post(&S_REGISTRATION);
+            }
+            else
+            {
+                log_event("Cannot enter registration (full)", pid);
+            }
+        }
+        else if (PATIENTS[pid].status == WAITING_GP)
+        {
+            log_event("Checking GP", pid);
+            if (sem_trywait(&S_GP) == 0) // Try to acquire the GP semaphore
+            {
+                // GP takes some time
+                msleep(myrand(0, GP_TIME));
+                // Let go of the GP semaphore
+                sem_post(&S_GP);
+            }
+            else
+            {
+                log_event("Cannot enter GP (full)", pid);
+            }
+        }
+        msleep(myrand(0, WAIT_TIME));
+    }
+    pthread_exit(NULL);
 }
 
 // IMPORTANT: Initialize the random number generator if you want your randomizer to be seeded.
@@ -192,7 +266,8 @@ patient create_patient(int pid)
     p.patient_id = pid;
     p.hunger_meter = myrand(1, 100);
     p.restroom_meter = myrand(1, 100);
-    p.need = myrand(0, NEED_CNT);
+    p.need = myrand(0, NEED_CNT - 1);
+    p.status = WAITING_REGISTRATION;
     return p;
 }
 
@@ -219,14 +294,12 @@ void init_semaphores()
     }
 }
 
-// Expects patient id as the arg
-void *patient_job(void *arg)
+void log_event(char *event, int pid)
 {
-    int pid = *(int *)arg;
-    while (1)
-    {
+    printf("[Patient %d]: %s\n", pid, event);
+}
 
-        break;
-    }
-    pthread_exit(NULL);
+void log_patient_details(patient p)
+{
+    printf("[Patient %d]: Hunger: %d, Restroom: %d, Need: %s\n", p.patient_id, p.hunger_meter, p.restroom_meter, need_str[p.need]);
 }
