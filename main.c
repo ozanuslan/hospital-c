@@ -477,7 +477,7 @@ void *patient_routine(void *arg)
                 // Let go of the OR semaphore
                 sem_post(&S_OR);
             }
-            else
+            else // Couldn't acquire OR semaphore
             {
                 log_patient_event("Cannot enter OR (full)", pid);
             }
@@ -503,6 +503,7 @@ void *patient_routine(void *arg)
 // The seed is the number that will be used to generate random numbers.
 // If you leave it blank, the current time will be used.
 // Note: Seeding is really useful for debugging, as it will make your program to generate the same random numbers every time.
+//  But it is not necessary for the assignment. Also, multithreaded applications still cause unpredictable behavior even if you seed.
 void init_random(unsigned int seed)
 {
     if (seed == 0)
