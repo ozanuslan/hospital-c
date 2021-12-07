@@ -5,29 +5,8 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <semaphore.h>
-
-// Needs of the patients
-typedef enum Need
-{
-    SURGERY,
-    MEDICINE,
-    BLOOD_TEST,
-    // You can add new needs here
-    NEED_CNT // NEED_CNT must always be at the end
-} need;
-
-char *need_str[] = {
-    "surgery",
-    "medicine",
-    "blood test"};
-
-typedef enum PatientState
-{
-    WAITING_REGISTRATION,
-    WAITING_GP,
-    // You can add new states here
-    PATIENT_STATE_CNT // PATIENT_STATE_CNT must always be at the end
-} patient_state;
+#include <string.h>
+#include <stdbool.h>
 
 // The number of registration desks that are available.
 #define REGISTRATION_SIZE 10
@@ -55,7 +34,7 @@ int NURSE_NUMBER = 30;
 #define NURSE_LIMIT 5
 
 // The number of patients that will be generated over the course of this program.
-#define PATIENT_NUMBER 100
+#define PATIENT_NUMBER 1000
 // The account of hospital where the money acquired from patients are stored.
 int HOSPITAL_WALLET = 0;
 
@@ -70,7 +49,7 @@ int HOSPITAL_WALLET = 0;
  *  that determines how long a patient will wait before each operation to retry to execute. 
  * Assuming the given department is full
 */
-#define ARRIVAL_TIME 40
+#define ARRIVAL_TIME 100
 #define WAIT_TIME 100
 #define REGISTRATION_TIME 100
 #define GP_TIME 200
@@ -82,7 +61,7 @@ int HOSPITAL_WALLET = 0;
 
 /**
  * The money that will be charged to the patients for given operations. 
- * The registrationand blood lab costs should be static (not randomly decided) 
+ * The registration and blood lab costs should be static (not randomly decided) 
  *  but pharmacy and cafe cost should be randomly generated between 1 and given value below 
  *   to account for differentmedicine and food that can be purchased.
  * The surgery cost should calculated based on number of doctors and nurses that was required to perform it. 
@@ -106,45 +85,91 @@ int HOSPITAL_WALLET = 0;
 */
 #define HUNGER_INCREASE_RATE 10
 #define RESTROOM_INCREASE_RATE 10
+#define MAX_HUNGER 100
+#define MAX_RESTROOM 100
+
+// Needs of the patients
+typedef enum Need
+{
+    SURGERY,
+    MEDICINE,
+    BLOOD_TEST,
+    // You can add new needs here
+    NEED_CNT // NEED_CNT must always be at the end
+} need;
+
+// When you add new needs, you must add their names here
+// String array of the names of the needs
+char *need_str[] = {
+    "surgery",
+    "medicine",
+    "blood test"};
+
+typedef enum PatientState
+{
+    WAITING_REGISTRATION,
+    WAITING_GP,
+    WAITING_BLOOD_LAB,
+    WAITING_OR,
+    WAITING_PHARMACY,
+    RETURNING_FROM_OR,
+    RETURNING_FROM_BLOOD_LAB,
+    EXITING_HOSPITAL,
+    // You can add new states here
+    PATIENT_STATE_CNT // PATIENT_STATE_CNT must always be at the end
+} patient_state;
+
+// When you add new states, you must add their names here
+// String representation of each state
+char *patient_state_str[] = {
+    "waiting registration",
+    "waiting GP",
+    "waiting blood lab",
+    "waiting OR",
+    "waiting pharmacy",
+    "returning from OR",
+    "returning from blood lab",
+    "exiting hospital"};
 
 typedef struct Patients
 {
-    int patient_id;
-    short hunger_meter;   // Initialized between 1 and 100 at creation.
-    short restroom_meter; // Initialized between 1 and 100 at creation.
-    unsigned short need;
-    unsigned short status;
+    int pid;
+    short hunger_meter;    // Initialized between 1 and 100 at creation.
+    short restroom_meter;  // Initialized between 1 and 100 at creation.
+    unsigned short need;   // Enum of needs.
+    unsigned short status; // Enum for patient state.
 
 } patient;
 
-void init_random(unsigned int seed);
-int myrand(int s, int e);
-void msleep(int msec);
-void init_semaphores();
-patient create_patient(int pid);
-void *patient_job(void *arg);
-void log_event(char *event, int pid);
-void log_patient_details(patient p);
+void init_random(unsigned int seed);                                     // Initializes randomizer with a seed
+int myrand(int s, int e);                                                // Returns a random number between s and e
+void msleep(int msec);                                                   // Sleeps for given milliseconds
+void init_semaphores();                                                  // Initializes all semaphores
+patient create_patient(int pid);                                         // Creates a new patient with given pid
+void *patient_routine(void *arg);                                        // Main execution block for threads
+void log_patient_event(char *event, int pid);                            // Logs an event for a patient
+void log_patient_details(patient p);                                     // Logs details of a patient
+void log_patient_payment_event(char *event, int payment_total, int pid); // Logs payment event for a patient
+void log_hospital_details();                                             // Logs wallet of hospital
 
-patient *PATIENTS;
+patient *PATIENTS; // Array of patients
 
 // Semaphores for all resources that need management
-sem_t S_REGISTRATION;
-sem_t S_RESTROOM;
-sem_t S_CAFE;
-sem_t S_GP;
-sem_t S_PHARMACY;
-sem_t S_BLOOD_LAB;
-sem_t S_OR;
-sem_t S_HOSPITAL_WALLET; // This is a binary semaphore
-sem_t S_SURGEON;         // This is a binary semaphore
-sem_t S_NURSE;           // This is a binary semaphore
+sem_t S_REGISTRATION;    // Semaphore for registration desk
+sem_t S_RESTROOM;        // Semaphore for restroom
+sem_t S_CAFE;            // Semaphore for cafe
+sem_t S_GP;              // Semaphore for General Practitioner
+sem_t S_PHARMACY;        // Semaphore for pharmacy
+sem_t S_BLOOD_LAB;       // Semaphore for blood lab
+sem_t S_OR;              // Semaphore for operating room
+sem_t S_HOSPITAL_WALLET; // Semaphore for hospital wallet. This is a binary semaphore!!!
+sem_t S_SURGEON_NURSE;   // Semaphore for surgeon and nurse count. This is a binary semaphore!!!
 
 int main()
 {
     // You can change the randomizer's seed to any number. But I chose to go with my student ID.
     // Setting the seed to 0 will initialize the randomizer to select current time as seed, thus resulting in expected randomness.
-    int seed = 2019510078;
+    int seed = 0;
 
     init_random(seed); // Initialize the random number generator
 
@@ -160,15 +185,14 @@ int main()
 
     for (int i = 0; i < PATIENT_NUMBER; i++)
     {
-        log_patient_details(PATIENTS[i]);
-        log_event("Attempting to create thread", i);
-        if (pthread_create(patient_thread + i, NULL, patient_job, &i) == 0)
+        log_patient_event("Attempting to create thread", i);
+        if (pthread_create(patient_thread + i, NULL, patient_routine, &i) == 0)
         {
-            msleep(myrand(0, ARRIVAL_TIME)); // <- TODO: Uncomment this
+            msleep(myrand(0, ARRIVAL_TIME));
         }
         else
         {
-            log_event("Failed to create", i);
+            log_patient_event("Failed to create", i);
         }
     }
 
@@ -177,59 +201,300 @@ int main()
         pthread_join(*(patient_thread + i), NULL);
     }
 
+    printf("\n\n---Simulation Completed---\n");
+    printf("Final Hospital Wallet: %d\n", HOSPITAL_WALLET);
+
     return 0;
 }
 
 // Expects patient id as the arg
-void *patient_job(void *arg)
+// Main execution block for threads
+void *patient_routine(void *arg)
 {
-    int pid = *(int *)arg;
-    log_event("Entered hospital", pid);
-    while (PATIENTS[pid].status == WAITING_REGISTRATION)
+    int pid = *(int *)arg;     // Get the patient id
+    patient p = PATIENTS[pid]; // Get patient from array for easier access
+
+    log_patient_event("Entered hospital", pid);
+    while (p.status != EXITING_HOSPITAL) // Patient stays in hospital until their operations are done
     {
-        if (PATIENTS[pid].status == WAITING_REGISTRATION)
+        log_patient_details(p);
+        // If the patient is too hungry, they will go to the cafe and wait
+        if (p.hunger_meter > MAX_HUNGER)
         {
-            log_event("Checking registration", pid);
+            log_patient_event("Is hungry, waiting in cafe", pid);
+            sem_wait(&S_CAFE);            // Wait for cafe to be free
+            msleep(myrand(1, CAFE_TIME)); // Wait for a random amount of time
+            p.hunger_meter = 0;
+            log_patient_event("Got food from cafe, no longer hungry", pid);
+            sem_post(&S_CAFE);
+        }
+        // If the patient needs to go to the restroom, they will wait in line
+        else if (p.restroom_meter > MAX_RESTROOM)
+        {
+            log_patient_event("Needs to go to the restroom, waiting for available stalls", pid);
+            sem_wait(&S_RESTROOM);            // Wait for restroom to be free
+            msleep(myrand(1, RESTROOM_TIME)); // Wait for a random amount of time
+            p.restroom_meter = 0;
+            log_patient_event("Came back from restroom", pid);
+            sem_post(&S_RESTROOM);
+        }
+        // Upon entering the hospital all patients need to register
+        else if (p.status == WAITING_REGISTRATION)
+        {
+            log_patient_event("Checking registration", pid);
             if (sem_trywait(&S_REGISTRATION) == 0) // Try to acquire the registration semaphore
             {
-                log_event("Entered registration area", pid);
+                log_patient_event("Entered registration area", pid);
 
                 // Registration takes some time
-                msleep(myrand(0, REGISTRATION_TIME));
+                msleep(myrand(1, REGISTRATION_TIME));
 
                 // Every person who registers must pay for registration
-                log_event("Waiting to pay registration cost", pid);
+                log_patient_event("Waiting to pay registration cost", pid);
                 sem_wait(&S_HOSPITAL_WALLET);
                 HOSPITAL_WALLET += REGISTRATION_COST;
+                log_patient_payment_event("Paid registration cost: ", REGISTRATION_COST, pid);
+                log_hospital_details();
                 sem_post(&S_HOSPITAL_WALLET);
 
-                log_event("Registered successfully", pid);
-                PATIENTS[pid].status = WAITING_GP;
+                log_patient_event("Registered successfully", pid);
+                p.status = WAITING_GP;
                 // Let go of the registration semaphore
                 sem_post(&S_REGISTRATION);
             }
             else
             {
-                log_event("Cannot enter registration (full)", pid);
+                log_patient_event("Cannot enter registration (full)", pid);
             }
         }
-        else if (PATIENTS[pid].status == WAITING_GP)
+        /**
+         * Patient needs to visit GP if they have just left registration and they will visit the GP for the first time
+         * or if they have given blood test results and they need to visit the GP again
+         * or if they have finished their surgery in the OR and they need to visit the GP again
+         */
+        else if (p.status == WAITING_GP || p.status == RETURNING_FROM_BLOOD_LAB || p.status == RETURNING_FROM_OR)
         {
-            log_event("Checking GP", pid);
+            log_patient_event("Checking GP", pid);
             if (sem_trywait(&S_GP) == 0) // Try to acquire the GP semaphore
             {
-                // GP takes some time
-                msleep(myrand(0, GP_TIME));
+                if (p.need == MEDICINE)
+                {
+                    log_patient_event("Arrived in GP's room", pid);
+
+                    // GP examination takes some time
+                    msleep(myrand(1, GP_TIME));
+
+                    log_patient_event("Needs medicine, GP forwarded him to Pharmacy", pid);
+                    p.status = WAITING_PHARMACY;
+                }
+                else if (p.status == RETURNING_FROM_OR || p.status == RETURNING_FROM_BLOOD_LAB)
+                {
+                    if (p.status == RETURNING_FROM_OR)
+                        log_patient_event("Returned from OR to GP", pid);
+
+                    else if (p.status == RETURNING_FROM_BLOOD_LAB)
+                        log_patient_event("Returned from Blood Lab to GP", pid);
+
+                    // GP examination takes some time
+                    msleep(myrand(1, GP_TIME));
+
+                    if (myrand(0, 1) == 0) // Randomly decide if patient needs medicine or not
+                    {
+                        log_patient_event("Needs medicine, GP forwarded him to Pharmacy", pid);
+                        p.status = WAITING_PHARMACY;
+                    }
+                    else
+                    {
+                        log_patient_event("Does not need to get medicine", pid);
+                        p.status = EXITING_HOSPITAL;
+                    }
+                }
+                else if (p.need == BLOOD_TEST || p.need == SURGERY)
+                {
+                    log_patient_event("Arrived in GP's room", pid);
+
+                    // GP examination takes some time
+                    msleep(myrand(1, GP_TIME));
+
+                    if (p.need == BLOOD_TEST)
+                    {
+                        log_patient_event("Needs blood test, GP forwarded him to Blood Lab", pid);
+                        p.status = WAITING_BLOOD_LAB;
+                    }
+                    else if (p.need == SURGERY)
+                    {
+                        log_patient_event("Needs surgery, GP forwarded him to OR", pid);
+                        p.status = WAITING_OR;
+                    }
+                }
+                else // This condition should never be reached, but added just in case
+                {
+                    log_patient_event("Arrived in GP's room", pid);
+
+                    // GP examination takes some time
+                    msleep(myrand(1, GP_TIME));
+
+                    log_patient_event("Has an unknown need (bug?), GP forwarded him to the exit", pid);
+                    p.status = EXITING_HOSPITAL;
+                }
                 // Let go of the GP semaphore
                 sem_post(&S_GP);
             }
             else
             {
-                log_event("Cannot enter GP (full)", pid);
+                log_patient_event("Cannot enter GP (full)", pid);
             }
         }
+        // Patients will go to pharmacy if they have been forwarded by the GP
+        else if (p.status == WAITING_PHARMACY)
+        {
+            log_patient_event("Checking Pharmacy", pid);
+            if (sem_trywait(&S_PHARMACY) == 0) // Try to acquire the Pharmacy semaphore
+            {
+                log_patient_event("Entered Pharmacy", pid);
+                // Pharmacy examination takes some time
+                msleep(myrand(1, PHARMACY_TIME));
+                log_patient_event("Received medicine from Pharmacy", pid);
+
+                // Patient needs to pay for medicine
+                log_patient_event("Waiting to pay medicine cost", pid);
+                sem_wait(&S_HOSPITAL_WALLET);
+                int payment = myrand(1, PHARMACY_COST);
+                HOSPITAL_WALLET += payment;
+                log_patient_payment_event("Paid medicine cost: ", payment, pid);
+                log_hospital_details();
+                sem_post(&S_HOSPITAL_WALLET);
+
+                p.status = EXITING_HOSPITAL;
+                // Let go of the Pharmacy semaphore
+                sem_post(&S_PHARMACY);
+            }
+            else
+            {
+                log_patient_event("Cannot enter Pharmacy (full)", pid);
+            }
+        }
+        else if (p.status == WAITING_BLOOD_LAB)
+        {
+            log_patient_event("Checking Blood Lab", pid);
+            if (sem_trywait(&S_BLOOD_LAB) == 0) // Try to acquire the Blood Lab semaphore
+            {
+                log_patient_event("Entered Blood Lab", pid);
+
+                // Blood test takes some time
+                msleep(myrand(1, BLOOD_LAB_TIME));
+                log_patient_event("Gave blood sample", pid);
+
+                // Patient needs to pay for blood test
+                log_patient_event("Waiting to pay blood test cost", pid);
+                sem_wait(&S_HOSPITAL_WALLET); // Wait for hospital wallet to be free
+                int payment = myrand(1, BLOOD_LAB_COST);
+                HOSPITAL_WALLET += payment;
+                log_patient_payment_event("Paid blood test cost: ", payment, pid);
+                log_hospital_details();
+                sem_post(&S_HOSPITAL_WALLET);
+
+                p.status = RETURNING_FROM_BLOOD_LAB;
+                // Let go of the Blood Lab semaphore
+                sem_post(&S_BLOOD_LAB);
+            }
+            else
+            {
+                log_patient_event("Cannot enter Blood Lab (full)", pid);
+            }
+        }
+        else if (p.status == WAITING_OR)
+        {
+            log_patient_event("Checking OR", pid);
+            if (sem_trywait(&S_OR) == 0) // Try to acquire the OR semaphore
+            {
+                log_patient_event("Entered OR", pid);
+
+                // Try to allocate surgeons and nurses
+                bool staff_available = false;
+                int surgeons_needed = myrand(1, SURGEON_LIMIT);
+                int nurses_needed = myrand(1, NURSE_LIMIT);
+
+                // Construct message for needed staff
+                char event_msg[100];
+                char surgeon_msg[20];
+                sprintf(surgeon_msg, "Surgeons: %d", surgeons_needed);
+                char nurse_msg[20];
+                sprintf(nurse_msg, "Nurses: %d", nurses_needed);
+                strcpy(event_msg, "Needs ");
+                strcat(event_msg, surgeon_msg);
+                strcat(event_msg, " and ");
+                strcat(event_msg, nurse_msg);
+
+                log_patient_event(event_msg, pid);
+
+                /**
+                 * Once a patient has entered OR it does not make sense for them to 
+                 * leave for cafe or restroom while waiting staff since it will break hygiene rules
+                 */
+
+                // Try to acquire the needed staff
+                while (!staff_available)
+                {
+                    sem_wait(&S_SURGEON_NURSE);
+                    if (SURGEON_NUMBER >= surgeons_needed && NURSE_NUMBER >= nurses_needed)
+                    {
+                        staff_available = true;
+                        SURGEON_NUMBER -= surgeons_needed;
+                        NURSE_NUMBER -= nurses_needed;
+                        log_patient_event("Allocated necessary surgeons and nurses", pid);
+                    }
+                    else
+                    {
+                        log_patient_event("Not enough staff is available for surgery, waiting for them to become available", pid);
+                    }
+                    sem_post(&S_SURGEON_NURSE);
+                    if (!staff_available)
+                        msleep(myrand(1, WAIT_TIME)); // Small wait so it does not lock up
+                }
+
+                // Surgery takes some time
+                msleep(500);
+
+                // Free the staff
+                sem_wait(&S_SURGEON_NURSE);
+                SURGEON_NUMBER += surgeons_needed;
+                NURSE_NUMBER += nurses_needed;
+                sem_post(&S_SURGEON_NURSE);
+
+                log_patient_event("Surgery finished", pid);
+
+                // Patient needs to pay for surgery
+                log_patient_event("Waiting to pay surgery cost", pid);
+                sem_wait(&S_HOSPITAL_WALLET); // Wait for hospital wallet to be free
+                int payment = SURGERY_OR_COST + (surgeons_needed * SURGERY_SURGEON_COST) + (nurses_needed * SURGERY_NURSE_COST);
+                HOSPITAL_WALLET += payment;
+                log_patient_payment_event("Paid surgery cost: ", payment, pid);
+                log_hospital_details();
+                sem_post(&S_HOSPITAL_WALLET);
+
+                p.status = RETURNING_FROM_OR;
+                // Let go of the OR semaphore
+                sem_post(&S_OR);
+            }
+            else
+            {
+                log_patient_event("Cannot enter OR (full)", pid);
+            }
+        }
+        if (p.status == EXITING_HOSPITAL)
+        {
+            log_patient_event("Exiting hospital", pid);
+            break;
+        }
+        // Increase hunger meter and restroom meter
+        p.hunger_meter += myrand(1, HUNGER_INCREASE_RATE);
+        p.restroom_meter += myrand(1, RESTROOM_INCREASE_RATE);
+        // Wait the general wait time
         msleep(myrand(0, WAIT_TIME));
     }
+    PATIENTS[pid] = p; // Update patient just in case it is used later
+    log_patient_event("Exited hospital", pid);
     pthread_exit(NULL);
 }
 
@@ -263,10 +528,10 @@ void msleep(int msec)
 patient create_patient(int pid)
 {
     patient p;
-    p.patient_id = pid;
-    p.hunger_meter = myrand(1, 100);
-    p.restroom_meter = myrand(1, 100);
-    p.need = myrand(0, NEED_CNT - 1);
+    p.pid = pid;
+    p.hunger_meter = myrand(1, MAX_HUNGER);
+    p.restroom_meter = myrand(1, MAX_RESTROOM);
+    p.need = myrand(1, NEED_CNT - 1);
     p.status = WAITING_REGISTRATION;
     return p;
 }
@@ -281,8 +546,7 @@ void init_semaphores()
                     sem_init(&S_BLOOD_LAB, 0, BLOOD_LAB_NUMBER),
                     sem_init(&S_OR, 0, OR_NUMBER),
                     sem_init(&S_HOSPITAL_WALLET, 0, 1), // Binary semaphore
-                    sem_init(&S_SURGEON, 0, 1),         // Binary semaphore
-                    sem_init(&S_NURSE, 0, 1)};          // Binary semaphore
+                    sem_init(&S_SURGEON_NURSE, 0, 1)};  // Binary semaphore
 
     for (int i = 0; i < sizeof(sems) / sizeof(int); i++)
     {
@@ -294,12 +558,22 @@ void init_semaphores()
     }
 }
 
-void log_event(char *event, int pid)
+void log_patient_event(char *event, int pid)
 {
     printf("[Patient %d]: %s\n", pid, event);
 }
 
+void log_patient_payment_event(char *event, int payment_total, int pid)
+{
+    printf("[Patient %d]: %s%d\n", pid, event, payment_total);
+}
+
 void log_patient_details(patient p)
 {
-    printf("[Patient %d]: Hunger: %d, Restroom: %d, Need: %s\n", p.patient_id, p.hunger_meter, p.restroom_meter, need_str[p.need]);
+    printf("[Patient %d]: Hunger: %d, Restroom: %d, Status: %s\n", p.pid, p.hunger_meter, p.restroom_meter, patient_state_str[p.status]);
+}
+
+void log_hospital_details()
+{
+    printf("[Hospital]: Wallet: %d\n", HOSPITAL_WALLET);
 }
