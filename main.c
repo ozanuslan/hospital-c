@@ -167,7 +167,7 @@ sem_t S_SURGEON_NURSE;   // Semaphore for surgeon and nurse count. This is a bin
 
 int main()
 {
-    // You can change the randomizer's seed to any number. But I chose to go with my student ID.
+    // You can change the randomizer's seed to any number.
     // Setting the seed to 0 will initialize the randomizer to select current time as seed, thus resulting in expected randomness.
     int seed = 0;
 
@@ -219,7 +219,7 @@ void *patient_routine(void *arg)
     {
         log_patient_details(p);
         // If the patient is too hungry, they will go to the cafe and wait
-        if (p.hunger_meter > MAX_HUNGER)
+        if (p.hunger_meter >= MAX_HUNGER)
         {
             log_patient_event("Is hungry, waiting in cafe", pid);
             sem_wait(&S_CAFE);            // Wait for cafe to be free
@@ -229,7 +229,7 @@ void *patient_routine(void *arg)
             sem_post(&S_CAFE);
         }
         // If the patient needs to go to the restroom, they will wait in line
-        else if (p.restroom_meter > MAX_RESTROOM)
+        else if (p.restroom_meter >= MAX_RESTROOM)
         {
             log_patient_event("Needs to go to the restroom, waiting for available stalls", pid);
             sem_wait(&S_RESTROOM);            // Wait for restroom to be free
@@ -279,7 +279,7 @@ void *patient_routine(void *arg)
             {
                 if (p.need == MEDICINE)
                 {
-                    log_patient_event("Arrived in GP's room", pid);
+                    log_patient_event("Entered a GP room", pid);
 
                     // GP examination takes some time
                     msleep(myrand(1, GP_TIME));
@@ -311,7 +311,7 @@ void *patient_routine(void *arg)
                 }
                 else if (p.need == BLOOD_TEST || p.need == SURGERY)
                 {
-                    log_patient_event("Arrived in GP's room", pid);
+                    log_patient_event("Entered a GP room", pid);
 
                     // GP examination takes some time
                     msleep(myrand(1, GP_TIME));
@@ -408,7 +408,7 @@ void *patient_routine(void *arg)
             log_patient_event("Checking OR", pid);
             if (sem_trywait(&S_OR) == 0) // Try to acquire the OR semaphore
             {
-                log_patient_event("Entered OR", pid);
+                log_patient_event("Entered an OR", pid);
 
                 // Try to allocate surgeons and nurses
                 bool staff_available = false;
@@ -453,6 +453,8 @@ void *patient_routine(void *arg)
                         msleep(myrand(1, WAIT_TIME)); // Small wait so it does not lock up
                 }
 
+                log_patient_event("Started surgery", pid);
+
                 // Surgery takes some time
                 msleep(500);
 
@@ -462,7 +464,7 @@ void *patient_routine(void *arg)
                 NURSE_NUMBER += nurses_needed;
                 sem_post(&S_SURGEON_NURSE);
 
-                log_patient_event("Surgery finished", pid);
+                log_patient_event("Finished surgery", pid);
 
                 // Patient needs to pay for surgery
                 log_patient_event("Waiting to pay surgery cost", pid);
