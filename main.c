@@ -539,18 +539,21 @@ patient create_patient(int pid)
 
 void init_semaphores()
 {
-    int sems[10] = {sem_init(&S_REGISTRATION, 0, REGISTRATION_SIZE),
-                    sem_init(&S_RESTROOM, 0, RESTROOM_SIZE),
-                    sem_init(&S_CAFE, 0, CAFE_NUMBER),
-                    sem_init(&S_GP, 0, GP_NUMBER),
-                    sem_init(&S_PHARMACY, 0, PHARMACY_NUMBER),
-                    sem_init(&S_BLOOD_LAB, 0, BLOOD_LAB_NUMBER),
-                    sem_init(&S_OR, 0, OR_NUMBER),
-                    sem_init(&S_HOSPITAL_WALLET, 0, 1), // Binary semaphore
-                    sem_init(&S_SURGEON_NURSE, 0, 1)};  // Binary semaphore
+    int sems[9] = {sem_init(&S_REGISTRATION, 0, REGISTRATION_SIZE),
+                   sem_init(&S_RESTROOM, 0, RESTROOM_SIZE),
+                   sem_init(&S_CAFE, 0, CAFE_NUMBER),
+                   sem_init(&S_GP, 0, GP_NUMBER),
+                   sem_init(&S_PHARMACY, 0, PHARMACY_NUMBER),
+                   sem_init(&S_BLOOD_LAB, 0, BLOOD_LAB_NUMBER),
+                   sem_init(&S_OR, 0, OR_NUMBER),
+                   sem_init(&S_HOSPITAL_WALLET, 0, 1), // Binary semaphore
+                   sem_init(&S_SURGEON_NURSE, 0, 1)};  // Binary semaphore
 
     for (int i = 0; i < sizeof(sems) / sizeof(int); i++)
     {
+        // Check if semaphore was initialized properly
+        // sem_init function returns 0 on success and -1 on failure
+        // source: https://man7.org/linux/man-pages/man3/sem_init.3.html
         if (sems[i] == -1)
         {
             printf("\nFailed to create some semaphores...\nExiting program.");
