@@ -138,7 +138,6 @@ typedef struct Patients
     short restroom_meter;  // Initialized between 1 and 100 at creation.
     unsigned short need;   // Enum of needs.
     unsigned short status; // Enum for patient state.
-
 } patient;
 
 void init_random(unsigned int seed);                                     // Initializes randomizer with a seed
@@ -445,7 +444,6 @@ void *patient_routine(void *arg)
                 }
 
                 log_patient_event("Started surgery", pid);
-
                 msleep(myrand(1, SURGERY_TIME)); // Surgery takes some time
 
                 // Free the staff
