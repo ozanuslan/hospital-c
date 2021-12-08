@@ -172,6 +172,14 @@ int main()
 
     init_random(seed); // Initialize the random number generator
 
+    printf("---WELCOME TO THE HOSPITAL SIMULATION---\n");
+    printf("> Hospital has %d patients\n", PATIENT_NUMBER);
+    printf("> Hospital has %d doctors and %d nurses\n", SURGEON_NUMBER, NURSE_NUMBER);
+    printf("> Hospital has %d registration desks, %d cafes, %d pharmacies, %d blood labs, %d operating rooms, and %d general practitioners\n",
+           REGISTRATION_SIZE, CAFE_NUMBER, PHARMACY_NUMBER, BLOOD_LAB_NUMBER, OR_NUMBER, GP_NUMBER);
+    printf("Starting simulation...\n");
+    msleep(1000);
+
     PATIENTS = malloc(sizeof(patient) * PATIENT_NUMBER);
 
     for (int i = 0; i < PATIENT_NUMBER; i++)
@@ -191,7 +199,7 @@ int main()
         }
         else
         {
-            log_patient_event("Failed to create", i);
+            log_patient_event("!!!FAILED TO CREATE THREAD!!!", i);
         }
     }
 
