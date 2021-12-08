@@ -188,7 +188,7 @@ int main()
         log_patient_event("Attempting to create thread", i);
         if (pthread_create(patient_thread + i, NULL, patient_routine, &i) == 0)
         {
-            msleep(myrand(0, ARRIVAL_TIME));
+            msleep(myrand(1, ARRIVAL_TIME));
         }
         else
         {
@@ -245,9 +245,7 @@ void *patient_routine(void *arg)
             if (sem_trywait(&S_REGISTRATION) == 0) // Try to acquire the registration semaphore
             {
                 log_patient_event("Entered registration area", pid);
-
-                // Registration takes some time
-                msleep(myrand(1, REGISTRATION_TIME));
+                msleep(myrand(1, REGISTRATION_TIME)); // Registration takes some time
 
                 // Every person who registers must pay for registration
                 log_patient_event("Waiting to pay registration cost", pid);
@@ -259,8 +257,8 @@ void *patient_routine(void *arg)
 
                 log_patient_event("Registered successfully", pid);
                 p.status = WAITING_GP;
-                // Let go of the registration semaphore
-                sem_post(&S_REGISTRATION);
+
+                sem_post(&S_REGISTRATION); // Let go of the registration semaphore
             }
             else
             {
@@ -279,10 +277,9 @@ void *patient_routine(void *arg)
             {
                 if (p.need == MEDICINE)
                 {
-                    log_patient_event("Entered a GP room", pid);
+                    log_patient_event("Entered GP", pid);
 
-                    // GP examination takes some time
-                    msleep(myrand(1, GP_TIME));
+                    msleep(myrand(1, GP_TIME)); // GP examination takes some time
 
                     log_patient_event("Needs medicine, GP forwarded him to Pharmacy", pid);
                     p.status = WAITING_PHARMACY;
@@ -305,13 +302,13 @@ void *patient_routine(void *arg)
                     }
                     else
                     {
-                        log_patient_event("Does not need to get medicine", pid);
+                        log_patient_event("Does not need to get medicine, GP forwarded him to the exit", pid);
                         p.status = EXITING_HOSPITAL;
                     }
                 }
                 else if (p.need == BLOOD_TEST || p.need == SURGERY)
                 {
-                    log_patient_event("Entered a GP room", pid);
+                    log_patient_event("Entered GP", pid);
 
                     // GP examination takes some time
                     msleep(myrand(1, GP_TIME));
@@ -331,14 +328,13 @@ void *patient_routine(void *arg)
                 {
                     log_patient_event("Arrived in GP's room", pid);
 
-                    // GP examination takes some time
-                    msleep(myrand(1, GP_TIME));
+                    msleep(myrand(1, GP_TIME)); // GP examination takes some time
 
                     log_patient_event("Has an unknown need (bug?), GP forwarded him to the exit", pid);
                     p.status = EXITING_HOSPITAL;
                 }
-                // Let go of the GP semaphore
-                sem_post(&S_GP);
+
+                sem_post(&S_GP); // Let go of the GP semaphore
             }
             else
             {
@@ -352,8 +348,7 @@ void *patient_routine(void *arg)
             if (sem_trywait(&S_PHARMACY) == 0) // Try to acquire the Pharmacy semaphore
             {
                 log_patient_event("Entered Pharmacy", pid);
-                // Pharmacy examination takes some time
-                msleep(myrand(1, PHARMACY_TIME));
+                msleep(myrand(1, PHARMACY_TIME)); // Pharmacy examination takes some time
                 log_patient_event("Received medicine from Pharmacy", pid);
 
                 // Patient needs to pay for medicine
@@ -366,8 +361,8 @@ void *patient_routine(void *arg)
                 sem_post(&S_HOSPITAL_WALLET);
 
                 p.status = EXITING_HOSPITAL;
-                // Let go of the Pharmacy semaphore
-                sem_post(&S_PHARMACY);
+
+                sem_post(&S_PHARMACY); // Let go of the Pharmacy semaphore
             }
             else
             {
@@ -380,9 +375,7 @@ void *patient_routine(void *arg)
             if (sem_trywait(&S_BLOOD_LAB) == 0) // Try to acquire the Blood Lab semaphore
             {
                 log_patient_event("Entered Blood Lab", pid);
-
-                // Blood test takes some time
-                msleep(myrand(1, BLOOD_LAB_TIME));
+                msleep(myrand(1, BLOOD_LAB_TIME)); // Blood test takes some time
                 log_patient_event("Gave blood sample", pid);
 
                 // Patient needs to pay for blood test
@@ -395,8 +388,8 @@ void *patient_routine(void *arg)
                 sem_post(&S_HOSPITAL_WALLET);
 
                 p.status = RETURNING_FROM_BLOOD_LAB;
-                // Let go of the Blood Lab semaphore
-                sem_post(&S_BLOOD_LAB);
+
+                sem_post(&S_BLOOD_LAB); // Let go of the Blood Lab semaphore
             }
             else
             {
@@ -410,17 +403,18 @@ void *patient_routine(void *arg)
             {
                 log_patient_event("Entered an OR", pid);
 
-                // Try to allocate surgeons and nurses
-                bool staff_available = false;
+                // Determine needed staff for surgery
                 int surgeons_needed = myrand(1, SURGEON_LIMIT);
                 int nurses_needed = myrand(1, NURSE_LIMIT);
 
-                // Construct message for needed staff
-                char event_msg[100];
+                // Construct strings for needed staff
                 char surgeon_msg[20];
                 sprintf(surgeon_msg, "Surgeons: %d", surgeons_needed);
                 char nurse_msg[20];
                 sprintf(nurse_msg, "Nurses: %d", nurses_needed);
+
+                // Construct message for log
+                char event_msg[100];
                 strcpy(event_msg, "Needs ");
                 strcat(event_msg, surgeon_msg);
                 strcat(event_msg, " and ");
@@ -434,6 +428,7 @@ void *patient_routine(void *arg)
                  */
 
                 // Try to acquire the needed staff
+                bool staff_available = false;
                 while (!staff_available)
                 {
                     sem_wait(&S_SURGEON_NURSE);
@@ -448,15 +443,15 @@ void *patient_routine(void *arg)
                     {
                         log_patient_event("Not enough staff is available for surgery, waiting for them to become available", pid);
                     }
-                    sem_post(&S_SURGEON_NURSE);
+                    sem_post(&S_SURGEON_NURSE); // Free the semaphore so other threads can check if staff is available
+
                     if (!staff_available)
                         msleep(myrand(1, WAIT_TIME)); // Small wait so it does not lock up
                 }
 
                 log_patient_event("Started surgery", pid);
 
-                // Surgery takes some time
-                msleep(500);
+                msleep(myrand(1, SURGERY_TIME)); // Surgery takes some time
 
                 // Free the staff
                 sem_wait(&S_SURGEON_NURSE);
@@ -476,8 +471,8 @@ void *patient_routine(void *arg)
                 sem_post(&S_HOSPITAL_WALLET);
 
                 p.status = RETURNING_FROM_OR;
-                // Let go of the OR semaphore
-                sem_post(&S_OR);
+
+                sem_post(&S_OR); // Let go of the OR semaphore
             }
             else // Couldn't acquire OR semaphore
             {
@@ -489,11 +484,12 @@ void *patient_routine(void *arg)
             log_patient_event("Exiting hospital", pid);
             break;
         }
+
         // Increase hunger meter and restroom meter
         p.hunger_meter += myrand(1, HUNGER_INCREASE_RATE);
         p.restroom_meter += myrand(1, RESTROOM_INCREASE_RATE);
-        // Wait the general wait time
-        msleep(myrand(0, WAIT_TIME));
+
+        msleep(myrand(0, WAIT_TIME)); // Wait the general wait time
     }
     PATIENTS[pid] = p; // Update patient just in case it is used later
     log_patient_event("Exited hospital", pid);
