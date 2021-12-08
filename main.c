@@ -278,7 +278,6 @@ void *patient_routine(void *arg)
                 if (p.need == MEDICINE)
                 {
                     log_patient_event("Entered GP", pid);
-
                     msleep(myrand(1, GP_TIME)); // GP examination takes some time
 
                     log_patient_event("Needs medicine, GP forwarded him to Pharmacy", pid);
@@ -292,8 +291,7 @@ void *patient_routine(void *arg)
                     else if (p.status == RETURNING_FROM_BLOOD_LAB)
                         log_patient_event("Returned from Blood Lab to GP", pid);
 
-                    // GP examination takes some time
-                    msleep(myrand(1, GP_TIME));
+                    msleep(myrand(1, GP_TIME)); // GP examination takes some time
 
                     if (myrand(0, 1) == 0) // Randomly decide if patient needs medicine or not
                     {
@@ -309,9 +307,7 @@ void *patient_routine(void *arg)
                 else if (p.need == BLOOD_TEST || p.need == SURGERY)
                 {
                     log_patient_event("Entered GP", pid);
-
-                    // GP examination takes some time
-                    msleep(myrand(1, GP_TIME));
+                    msleep(myrand(1, GP_TIME)); // GP examination takes some time
 
                     if (p.need == BLOOD_TEST)
                     {
@@ -327,7 +323,6 @@ void *patient_routine(void *arg)
                 else // This condition should never be reached, but added just in case
                 {
                     log_patient_event("Arrived in GP's room", pid);
-
                     msleep(myrand(1, GP_TIME)); // GP examination takes some time
 
                     log_patient_event("Has an unknown need (bug?), GP forwarded him to the exit", pid);
