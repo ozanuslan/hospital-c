@@ -175,9 +175,9 @@ int main()
     printf("---WELCOME TO THE HOSPITAL SIMULATION---\n");
     printf("> Hospital has %d patients\n", PATIENT_NUMBER);
     printf("> Hospital has %d doctors and %d nurses\n", SURGEON_NUMBER, NURSE_NUMBER);
-    printf("> Hospital has %d registration desks, %d cafes, %d pharmacies, %d blood labs, %d operating rooms, and %d general practitioners\n",
-           REGISTRATION_SIZE, CAFE_NUMBER, PHARMACY_NUMBER, BLOOD_LAB_NUMBER, OR_NUMBER, GP_NUMBER);
-    printf("Starting simulation...\n");
+    printf("> Hospital has %d registration desks, %d cafes, restrooms %d, %d pharmacies, %d blood labs, %d operating rooms, and %d general practitioners\n",
+           REGISTRATION_SIZE, CAFE_NUMBER, RESTROOM_SIZE, PHARMACY_NUMBER, BLOOD_LAB_NUMBER, OR_NUMBER, GP_NUMBER);
+    printf("Starting simulation...\n\n");
     msleep(1000);
 
     PATIENTS = malloc(sizeof(patient) * PATIENT_NUMBER);
