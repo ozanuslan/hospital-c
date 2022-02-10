@@ -150,5 +150,4 @@ If you have any questions or problems regarding this lab paper, you can ask abou
 If you wish, you can also ask it in class forums or assignment page comments.
 
 However, please do not send emails because that would lead to asking the same questions over and over again.
-
 **GOOD LUCK TO YOU ALL!**
